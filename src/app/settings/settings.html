@@ -1,0 +1,146 @@
+<nav class="sidebar" [attr.aria-label]="i18n.t('settings.nav')">
+  <div class="brand">{{ i18n.t('app.name') }}</div>
+  <ul role="tablist" aria-orientation="vertical">
+    @for (item of sections; track item.id) {
+      <li>
+        <button type="button" role="tab"
+                [id]="'tab-' + item.id"
+                [attr.aria-selected]="section() === item.id"
+                [attr.aria-controls]="'panel-' + item.id"
+                [class.active]="section() === item.id"
+                (click)="section.set(item.id)">
+          {{ i18n.t(item.key) }}
+        </button>
+      </li>
+    }
+  </ul>
+  <div class="status" aria-live="polite">
+    @switch (status()) {
+      @case ('saved') { <span class="ok">✓ {{ i18n.t('settings.saved') }}</span> }
+      @case ('error') { <span class="err">{{ i18n.t('settings.saveError') }}</span> }
+    }
+  </div>
+</nav>
+
+@if (s(); as s) {
+  <main class="content" role="tabpanel" [id]="'panel-' + section()" [attr.aria-labelledby]="'tab-' + section()">
+    @switch (section()) {
+      @case ('general') {
+        <h1>{{ i18n.t('settings.general') }}</h1>
+        <div class="group">
+          <label class="row">
+            <span>{{ i18n.t('settings.language') }}</span>
+            <select [value]="s.language" (change)="patch(d => d.language = $any($event.target).value)">
+              @for (l of languages; track l) {
+                <option [value]="l" [selected]="l === s.language">{{ i18n.t($any('settings.language.' + l)) }}</option>
+              }
+            </select>
+          </label>
+          <label class="row">
+            <span>{{ i18n.t('settings.launchAtLogin') }}</span>
+            <input type="checkbox" role="switch" [checked]="s.launchAtLogin"
+                   (change)="patch(d => d.launchAtLogin = $any($event.target).checked)">
+          </label>
+        </div>
+
+        <div class="group">
+          <label class="row">
+            <span>
+              {{ i18n.t('settings.historyLimit') }}
+              <small>{{ i18n.t('settings.historyLimitHint', limits) }}</small>
+            </span>
+            <input type="number" class="num" [min]="limits.min" [max]="limits.max" step="10"
+                   [value]="s.historyLimit" (change)="setHistoryLimit($any($event.target).value)">
+          </label>
+          <label class="row">
+            <span>{{ i18n.t('settings.persistHistory') }}</span>
+            <input type="checkbox" role="switch" [checked]="s.persistHistory"
+                   (change)="patch(d => d.persistHistory = $any($event.target).checked)">
+          </label>
+          <label class="row" [class.disabled]="!s.persistHistory">
+            <span>{{ i18n.t('settings.clearHistoryOnExit') }}</span>
+            <input type="checkbox" role="switch" [checked]="s.clearHistoryOnExit" [disabled]="!s.persistHistory"
+                   (change)="patch(d => d.clearHistoryOnExit = $any($event.target).checked)">
+          </label>
+          <label class="row">
+            <span>{{ i18n.t('settings.restoreClipboard') }}</span>
+            <input type="checkbox" role="switch" [checked]="s.restoreClipboard"
+                   (change)="patch(d => d.restoreClipboard = $any($event.target).checked)">
+          </label>
+        </div>
+      }
+
+      @case ('shortcuts') {
+        <h1>{{ i18n.t('settings.shortcuts') }}</h1>
+        <div class="group">
+          <div class="row">
+            <span>{{ i18n.t('settings.pickerShortcut') }}</span>
+            <pc-shortcut-recorder [label]="i18n.t('settings.pickerShortcut')" [value]="s.shortcuts.picker"
+                                  (valueChange)="patch(d => d.shortcuts.picker = $event)" />
+          </div>
+        </div>
+        <p class="hint">{{ i18n.t('settings.quickPasteHint') }}</p>
+        <div class="group">
+          @for (slot of quickSlots(); track slot.position; let i = $index) {
+            <div class="row">
+              <span>{{ i18n.t('settings.quickPaste', { n: slot.position }) }}</span>
+              <pc-shortcut-recorder [label]="i18n.t('settings.quickPaste', { n: slot.position })" [value]="slot.value"
+                                    (valueChange)="setQuickPaste(i, $event)" />
+            </div>
+          }
+        </div>
+      }
+
+      @case ('privacy') {
+        <h1>{{ i18n.t('settings.privacy') }}</h1>
+        <p class="hint">{{ i18n.t('settings.privacyConcealed') }}<br>{{ i18n.t('settings.privacyLocal') }}</p>
+        <h2 id="excluded-heading">{{ i18n.t('settings.excludedApps') }}</h2>
+        <p class="hint">{{ i18n.t('settings.excludedAppsHint') }}</p>
+        <div class="group">
+          <ul class="list" aria-labelledby="excluded-heading">
+            @for (app of s.excludedApps; track app) {
+              <li class="row">
+                <code>{{ app }}</code>
+                <button type="button" class="link danger" (click)="removeExcludedApp(app)"
+                        [attr.aria-label]="i18n.t('settings.excludedAppsRemove', { app })">×</button>
+              </li>
+            }
+          </ul>
+          <form class="row add" (submit)="$event.preventDefault(); addExcludedApp()">
+            <input type="text" [placeholder]="i18n.t('settings.excludedAppsPlaceholder')"
+                   [attr.aria-label]="i18n.t('settings.excludedApps')"
+                   [value]="newExcludedApp()" (input)="newExcludedApp.set($any($event.target).value)"
+                   spellcheck="false" autocomplete="off">
+            <button type="submit" class="btn" [disabled]="!newExcludedApp().trim()">{{ i18n.t('settings.excludedAppsAdd') }}</button>
+          </form>
+        </div>
+      }
+
+      @case ('platform') {
+        <h1>{{ i18n.t('settings.platform') }}</h1>
+        @if (backend.platform(); as p) {
+          <dl class="group facts">
+            <div class="row"><dt>{{ i18n.t('platform.os') }}</dt><dd>{{ p.os }} · {{ p.arch }}</dd></div>
+            @if (p.os === 'linux') {
+              <div class="row"><dt>{{ i18n.t('platform.session') }}</dt><dd>{{ p.displayServer }}</dd></div>
+              <div class="row"><dt>{{ i18n.t('platform.desktop') }}</dt><dd>{{ p.desktop ?? '–' }}</dd></div>
+            }
+          </dl>
+          <ul class="group caps">
+            @for (row of capabilities(); track row.key) {
+              <li class="cap">
+                <div class="row">
+                  <span>{{ i18n.t(row.key) }}</span>
+                  <span class="badge" [attr.data-support]="row.cap.support">{{ i18n.t(supportKey(row.cap)) }}</span>
+                </div>
+                @if (noteKey(row.cap); as note) {
+                  <small>{{ i18n.t(note) }}</small>
+                }
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  </main>
+}

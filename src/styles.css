@@ -1,0 +1,91 @@
+/* Design tokens. Components only consume variables, never raw colors. */
+:root {
+  color-scheme: light dark;
+
+  --pc-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, Ubuntu, Cantarell, sans-serif;
+  --pc-font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --pc-font-size: 13px;
+  --pc-font-size-sm: 12px;
+  --pc-font-size-lg: 15px;
+
+  --pc-space-1: 4px;
+  --pc-space-2: 8px;
+  --pc-space-3: 12px;
+  --pc-space-4: 16px;
+  --pc-space-5: 24px;
+
+  --pc-radius-sm: 6px;
+  --pc-radius: 10px;
+  --pc-radius-lg: 14px;
+
+  --pc-accent: #2563eb;
+  --pc-accent-fg: #ffffff;
+  --pc-accent-soft: color-mix(in srgb, var(--pc-accent) 14%, transparent);
+
+  --pc-bg: #ffffff;
+  --pc-bg-subtle: #f5f6f8;
+  --pc-bg-elevated: rgb(255 255 255 / 0.92);
+  --pc-fg: #16181d;
+  --pc-fg-muted: #626875;
+  --pc-border: #dfe2e8;
+  --pc-focus: color-mix(in srgb, var(--pc-accent) 55%, transparent);
+
+  --pc-ok: #15803d;
+  --pc-warn: #b45309;
+  --pc-error: #b91c1c;
+
+  --pc-shadow: 0 12px 40px rgb(0 0 0 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.06);
+  --pc-transition: 120ms ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pc-accent: #3b82f6;
+    --pc-bg: #1c1d21;
+    --pc-bg-subtle: #25272c;
+    --pc-bg-elevated: rgb(32 33 38 / 0.92);
+    --pc-fg: #eceef2;
+    --pc-fg-muted: #9aa0ab;
+    --pc-border: #353840;
+    --pc-ok: #4ade80;
+    --pc-warn: #fbbf24;
+    --pc-error: #f87171;
+    --pc-shadow: 0 12px 40px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --pc-transition: 0ms; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--pc-font);
+  font-size: var(--pc-font-size);
+  color: var(--pc-fg);
+  background: var(--pc-bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+/* The picker window is transparent; the component paints its own rounded panel. */
+html.pc-picker, html.pc-picker body { background: transparent; overflow: hidden; }
+
+:focus-visible {
+  outline: 2px solid var(--pc-focus);
+  outline-offset: 2px;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}

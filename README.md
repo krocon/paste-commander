@@ -1,0 +1,104 @@
+# Paste Commander
+
+Clipboard history for **macOS, Windows and Linux**. Everything you copy lands in a local history. A global shortcut opens a small picker, and the chosen entry is pasted straight into the app you were working in. Quick-paste shortcuts insert the 2nd–9th most recent entry without opening a window.
+
+Built with **Tauri 2 + Rust**; the UI is **Angular 22** (zoneless, signals, CSS variables). All logic lives in Rust. Everything stays local, and the app makes no network connections.
+
+> Status: **Phase 1 of 7**. The scaffold has a tray, single-instance, settings and autostart. History, clipboard watching and pasting are not implemented yet.
+
+## Platform matrix
+
+Researched November 2026.
+
+| Capability | macOS | Windows | Linux X11 | Wayland KDE / wlroots (Sway, Hyprland) | Wayland GNOME |
+|---|---|---|---|---|---|
+| Detect copies in the background | ✅ `NSPasteboard.changeCount` | ✅ `AddClipboardFormatListener` | ✅ XFixes | ✅ `ext-data-control-v1` (KWin 6.7+, Sway 1.11+, Hyprland 0.52+), fallback `wlr-data-control` | ❌ Mutter implements neither protocol |
+| Global shortcuts | ✅ | ✅ | ✅ | ⚠️ XDG portal `GlobalShortcuts` (own implementation, the Tauri plugin is X11-only) | ⚠️ portal (GNOME 48+) |
+| Simulate paste | ✅ needs Accessibility permission | ✅ `SendInput` (not into elevated windows) | ✅ XTest | ⚠️ KDE: `RemoteDesktop` portal + libei. wlroots: `virtual-keyboard` | ⚠️ `RemoteDesktop` portal + libei (permission prompt) |
+| Fallback | – | – | – | Entry goes to the clipboard and you press Ctrl+V | Only copies made while the app is focused. The UI says so |
+
+The app detects the session at runtime (`XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`) and shows what works on the **Settings › Platform** page.
+
+## Default shortcuts
+
+| | macOS | Windows / Linux |
+|---|---|---|
+| Open picker | ⇧⌘V | Ctrl+Alt+V |
+| Paste entry 2 / 3 (up to 9, configurable) | ⌃⌥2 / ⌃⌥3 | Ctrl+Alt+Shift+2 / 3 |
+
+The Windows/Linux defaults avoid two collisions:
+- Windows reports AltGr as Ctrl+Alt, so Ctrl+Alt+2/3 would swallow `²`/`³` on German keyboards.
+- Ctrl+Shift+V is "paste" in Linux terminals.
+
+All shortcuts can be re-recorded in the settings.
+
+## Development
+
+Prerequisites:
+- Rust stable (≥ 1.85, edition 2024)
+- Node 24
+- On Linux, the system packages below
+
+```bash
+npm install
+```
+
+```bash
+npm run tauri dev
+```
+
+The Angular dev server runs on port 1420. For pure UI work in a browser: `npm start`, then open `http://localhost:1420/` (settings) or `http://localhost:1420/?view=picker`.
+
+Tests:
+
+```bash
+npm test
+```
+
+```bash
+cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings
+```
+
+### Linux build dependencies (Debian/Ubuntu)
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential
+```
+
+Fedora: `webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel openssl-devel`.
+
+## Project layout
+
+```
+src/                      Angular UI (one bundle, the window label picks the view)
+  app/core/               Backend facade (signals), i18n (de/en), accelerator helpers
+  app/picker/             Picker window
+  app/settings/           Settings window + shortcut recorder
+src-tauri/src/
+  lib.rs                  App setup, plugins, run loop
+  settings.rs             Settings model, validation, tauri-plugin-store persistence
+  platform.rs             OS/session/capability detection
+  tray.rs                 Tray icon + menu
+  windows.rs              Picker (pre-created, hidden) and settings windows
+  commands.rs             Tauri commands (allow-listed in build.rs + capabilities/)
+  i18n.rs                 Native strings (tray, titles)
+```
+
+Planned modules: `watcher/` (trait `ClipboardWatcher` + macos/windows/x11/wayland_data_control/fallback), `privacy`, `history` (SQLite via `rusqlite`), `paste`, `hotkeys`.
+
+## Security
+
+- Every command must be listed in `build.rs` and granted in `src-tauri/capabilities/default.json`.
+- Strict CSP with no remote sources. `connect-src` only allows Tauri IPC.
+- `macOSPrivateApi` is enabled for the transparent picker. That is fine for direct distribution but not allowed in the Mac App Store.
+
+## Known limitations
+
+- **GNOME/Wayland:** background copies are invisible to third-party apps. A GNOME Shell extension bridge is planned for phase 2.
+- **macOS Secure Input:** while a password field or an app with Secure Input is active, simulated ⌘V is blocked.
+- **Windows UIPI:** you cannot paste into windows of elevated (administrator) processes unless Paste Commander runs elevated too.
+- Some apps (games, remote-desktop clients, some terminals) ignore synthetic key events.
+
+## License
+
+[MIT](LICENSE)
