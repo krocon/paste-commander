@@ -4,40 +4,96 @@ Clipboard history for **macOS, Windows and Linux**. Everything you copy lands in
 
 Built with **Tauri 2 + Rust**; the UI is **Angular 22** (zoneless, signals, CSS variables). All logic lives in Rust. Everything stays local, and the app makes no network connections.
 
-> Status: **Phase 6 of 7**. Recording, picker, pasting into the previous app, quick paste and global shortcuts work. Release pipeline and polish follow.
+## Features
+
+- **Background recording** of copied text. A text copied again moves to the top instead of being added twice. Blank text is ignored, and so are Paste Commander's own clipboard writes.
+- **Picker:**
+  - Opens on a global shortcut, centered on the monitor under the mouse. On macOS it also appears over full-screen apps and on every Space.
+  - Instant search over the full text.
+  - Pin, delete and keyboard-only operation.
+- **Direct paste into the previous app:** focus goes back to that app and ⌘V / Ctrl+V is simulated. Optionally, the previous clipboard text is restored afterwards.
+- **Quick paste:** shortcuts paste entries 2–9 without a window.
+- **Privacy:**
+  - Content marked confidential by password managers is never stored.
+  - An app exclusion list (pre-filled with common password managers).
+  - Pause mode.
+  - Everything stays local.
+- **Settings:**
+  - Shortcut recorder.
+  - History size (10–500).
+  - Persistence and "clear history on quit".
+  - Clipboard restore and launch at login.
+  - Platform status page showing what works in this session and which permissions are missing.
+- **Languages:** German and English, plus light and dark mode.
 
 ## Platform matrix
 
-Researched November 2026.
+Verified November 2026.
 
-| Capability | macOS | Windows | Linux X11 | Wayland KDE / wlroots (Sway, Hyprland) | Wayland GNOME |
+| Capability | macOS | Windows | Linux X11 | Wayland: KDE, Sway, Hyprland, … | Wayland: GNOME |
 |---|---|---|---|---|---|
-| Detect copies in the background | ✅ `NSPasteboard.changeCount` | ✅ `AddClipboardFormatListener` | ✅ XFixes | ✅ `ext-data-control-v1` (KWin 6.7+, Sway 1.11+, Hyprland 0.52+), fallback `wlr-data-control` | ❌ Mutter implements neither protocol |
-| Global shortcuts | ✅ | ✅ | ✅ | ⚠️ XDG portal `GlobalShortcuts` (own implementation, the Tauri plugin is X11-only) | ⚠️ portal (GNOME 48+) |
-| Simulate paste | ✅ needs Accessibility permission | ✅ `SendInput` (not into elevated windows) | ✅ XTest | ⚠️ KDE: `RemoteDesktop` portal + libei. wlroots: `virtual-keyboard` | ⚠️ `RemoteDesktop` portal + libei (permission prompt) |
-| Fallback | – | – | – | Entry goes to the clipboard and you press Ctrl+V | Only copies made while the app is focused. The UI says so |
+| Detect copies in the background | ✅ `NSPasteboard.changeCount` | ✅ `AddClipboardFormatListener` | ✅ XFixes | ✅ `ext-data-control-v1` (KWin 6.7+, Sway 1.11+, Hyprland 0.52+), fallback `wlr-data-control` | ❌ Mutter implements neither protocol. Best effort via XWayland only |
+| Global shortcuts | ✅ | ✅ | ✅ | ⚠️ XDG `GlobalShortcuts` portal, where the desktop confirms the binding | ⚠️ portal (GNOME 48+) |
+| Paste into the active app | ✅ with Accessibility permission | ✅ `SendInput` | ✅ XTest | ⚠️ wlroots: virtual keyboard. KDE: `RemoteDesktop` portal + libei | ⚠️ `RemoteDesktop` portal + libei (asks for permission) |
+| Fallback | Copy and show the hint "press ⌘V" | – | – | Copy, you press Ctrl+V | Copy, you press Ctrl+V |
 
-The app detects the session at runtime (`XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`) and shows what works on the **Settings › Platform** page.
+How the app adapts at runtime:
+- It detects the session from `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` and `XDG_CURRENT_DESKTOP`.
+- It starts the best available watcher.
+- **Settings › Platform** shows what is actually active and what is not supported.
 
-## Default shortcuts
+## Shortcuts
 
 | | macOS | Windows / Linux |
 |---|---|---|
 | Open picker | ⇧⌘V | Ctrl+Alt+V |
-| Paste entry 2 / 3 (up to 9, configurable) | ⌃⌥2 / ⌃⌥3 | Ctrl+Alt+Shift+2 / 3 |
+| Paste entry 2 / 3 (slots 4–9 can be assigned) | ⌃⌥2 / ⌃⌥3 | Ctrl+Alt+Shift+2 / 3 |
 
-The Windows/Linux defaults avoid two collisions:
+Why these defaults:
 - Windows reports AltGr as Ctrl+Alt, so Ctrl+Alt+2/3 would swallow `²`/`³` on German keyboards.
-- Ctrl+Shift+V is "paste" in Linux terminals.
+- Ctrl+Shift+V is "paste" in most Linux terminals.
+- ⇧⌘V shadows "Paste and Match Style" in some macOS apps. If you need that, record e.g. ⌥⌘V.
 
-All shortcuts can be re-recorded in the settings.
+Picker keys:
+
+| Key | Action |
+|---|---|
+| ↑ / ↓, PgUp / PgDn | Select |
+| ⏎ (also ⇧⏎) | Paste the selected entry |
+| ⌘1…⌘9 / Ctrl+1…Ctrl+9 | Paste entry 1–9 directly |
+| ⌘P / Ctrl+P | Pin / unpin |
+| Del | Delete the entry |
+| Esc, or the window losing focus | Close |
+
+Pasting from the picker moves the entry to the top. Quick paste keeps the order, so pressing the same shortcut twice pastes the same entry.
+
+## Permissions
+
+- **macOS:**
+  - **Accessibility** (System Settings › Privacy & Security › Accessibility) is needed to simulate ⌘V.
+  - On first launch without it, the settings window opens on the Platform page with a button to the right pane.
+  - Without the permission, entries are copied and a hint says "press ⌘V".
+- **Windows:** no permissions. Pasting into elevated (administrator) windows is blocked by UIPI unless Paste Commander runs elevated too.
+- **Linux X11:** none.
+- **Linux Wayland:**
+  - **Shortcuts:** the desktop shows a dialog to confirm the global shortcuts.
+  - **Pasting:** GNOME and KDE ask once per session for "remote desktop / input" permission. Sway and Hyprland use the virtual keyboard without a dialog.
+
+## Install
+
+Releases on GitHub provide:
+- macOS: a universal `.dmg`.
+- Windows: `.msi` and NSIS setup `.exe`.
+- Linux: `.AppImage`, `.deb` and `.rpm`.
+
+Linux runtime dependencies: WebKitGTK 4.1 and libayatana-appindicator (declared by the .deb).
 
 ## Development
 
 Prerequisites:
 - Rust stable (≥ 1.85, edition 2024)
 - Node 24
-- On Linux, the system packages below
+- On Linux, the packages below
 
 ```bash
 npm install
@@ -59,7 +115,21 @@ npm test
 cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings
 ```
 
-### Linux build dependencies (Debian/Ubuntu)
+```bash
+scripts/linux-watcher-tests.sh
+```
+
+The last one is Linux only. It runs the real watchers against Xvfb and a headless sway and needs `xvfb xclip sway`.
+
+Performance check (500 entries: list ≈ 1 ms, search ≈ 2 ms on an M-series Mac):
+
+```bash
+cd src-tauri && cargo test --release -- --ignored perf_ --nocapture
+```
+
+### Linux build dependencies
+
+Debian/Ubuntu:
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential
@@ -67,21 +137,47 @@ sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
 Fedora: `webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel openssl-devel`.
 
+## Release and signing
+
+Push a tag `vX.Y.Z` that matches `version` in `src-tauri/tauri.conf.json`. [`release.yml`](.github/workflows/release.yml) then builds all installers and attaches them to a **draft** release. Signing is optional: without secrets, the builds are unsigned.
+
+**macOS (Developer ID + notarization)**
+
+1. Export the Developer ID Application certificate as `.p12`.
+2. Set these repository secrets:
+   - `APPLE_CERTIFICATE`: the `.p12` file, base64-encoded.
+   - `APPLE_CERTIFICATE_PASSWORD`.
+   - `APPLE_SIGNING_IDENTITY`: e.g. `Developer ID Application: Name (TEAMID)`.
+   - `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password) and `APPLE_TEAM_ID`.
+
+Tauri signs with the hardened runtime and notarizes automatically. `LSUIElement` keeps the app out of the Dock.
+
+**Windows: options**
+
+| Option | Cost (2026) | Fit |
+|---|---|---|
+| **Azure Artifact Signing** (formerly Trusted Signing) | approx. $9.99/month | Best SmartScreen reputation path. In Germany it is available to **organizations only**; individuals must be in the US or Canada. The workflow supports it. |
+| OV/EV certificate (e.g. Certum, Sectigo) on a hardware token or cloud HSM | approx. €70–400/year | Works for individuals. Sign via `bundle.windows.signCommand` (e.g. `signtool` or a vendor cloud CLI). |
+| SignPath Foundation | free for OSS | For open-source projects after approval. Signing runs in their CI integration. |
+| Unsigned | – | SmartScreen warns ("unknown publisher") until downloads build reputation. |
+
+For Azure Artifact Signing, set:
+- secrets `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and `AZURE_TENANT_ID`
+- repository variables `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT` and `AZURE_SIGNING_PROFILE`
+
+**Linux:** AppImage, .deb and .rpm are not signed. Publish checksums with the release if needed.
+
 ## Project layout
 
 ```
 src/                      Angular UI (one bundle, the window label picks the view)
   app/core/               Backend facade (signals), i18n (de/en), accelerator helpers
-  app/picker/             Picker window
-  app/settings/           Settings window + shortcut recorder
+  app/picker/             Picker: list, search, keyboard, relative time
+  app/settings/           Settings window, shortcut recorder, platform status
 src-tauri/src/
-  lib.rs                  App setup, plugins, run loop
-  settings.rs             Settings model, validation, tauri-plugin-store persistence
-  platform.rs             OS/session/capability detection
-  tray.rs                 Tray icon + menu
-  windows.rs              Picker (pre-created, hidden) and settings windows
-  commands.rs             Tauri commands (allow-listed in build.rs + capabilities/)
-  i18n.rs                 Native strings (tray, titles)
+  lib.rs                  App setup, plugins, run loop, exit handling
+  settings.rs             Settings model, validation, persistence (tauri-plugin-store)
+  platform.rs             OS/session/capability detection, permissions
   history/                SQLite history: dedupe, pins, limit, search, persistence switch
   privacy.rs              Confidential markers (macOS/Windows/KDE), app exclusion list
   ingest.rs               watcher → pause → own-write guard → privacy → history
@@ -91,19 +187,15 @@ src-tauri/src/
     x11.rs                XFixes selection events, TARGETS/INCR; also the XWayland fallback
     wayland.rs            ext/wlr data-control via wl-clipboard-rs
     linux_it.rs           Integration tests against Xvfb and a headless sway
+  clipboard.rs            Clipboard writes (arboard), registered with the own-write guard
+  paste.rs                PasteService: focus restore, keystroke (enigo/XTest), clipboard restore
+  hotkeys.rs              Global shortcuts: Tauri plugin, or the XDG portal on Wayland
+  tray.rs, windows.rs     Tray menu; picker (pre-created) and settings windows
+  commands.rs             Tauri commands (allow-listed in build.rs + capabilities/)
+  i18n.rs                 Native strings (tray, notifications)
 ```
 
-Planned modules: `paste`, `hotkeys`.
-
-### Linux watcher integration tests
-
-`scripts/linux-watcher-tests.sh` runs the ignored watcher tests against Xvfb and a headless sway (needs `xvfb xclip sway`). CI runs it on Ubuntu. Locally on macOS, in Docker:
-
-```bash
-docker run --rm -v "$PWD":/work -w /work <image with tauri deps + xvfb xclip sway> scripts/linux-watcher-tests.sh
-```
-
-## Storage
+## Storage and privacy
 
 - **Location:** `history.sqlite3` in the app data directory:
   - macOS: `~/Library/Application Support/io.github.krocon.pastecommander/`
@@ -116,8 +208,8 @@ docker run --rm -v "$PWD":/work -w /work <image with tauri deps + xvfb xclip swa
 - **Confidential content is never stored:**
   - macOS: `org.nspasteboard.{Concealed,Transient,AutoGenerated}Type`
   - Windows: `ExcludeClipboardContentFromMonitorProcessing`, or `CanIncludeInClipboardHistory`/`CanUploadToCloudClipboard` = 0
-  - Linux: `x-kde-passwordManagerHint` = `secret`
-- **Default exclusion list:** common password managers (1Password, Bitwarden, KeePass/KeePassXC, Keychain/Passwords). You can edit it.
+  - Linux: `x-kde-passwordManagerHint` = `secret`. On Linux the secret text is not even transferred.
+- **Clipboard restore:** the previous clipboard is not restored if it held such content.
 
 ## Security
 
@@ -127,10 +219,12 @@ docker run --rm -v "$PWD":/work -w /work <image with tauri deps + xvfb xclip swa
 
 ## Known limitations
 
-- **GNOME/Wayland:** background copies are invisible to third-party apps. A GNOME Shell extension bridge is planned for phase 2.
-- **macOS Secure Input:** while a password field or an app with Secure Input is active, simulated ⌘V is blocked.
-- **Windows UIPI:** you cannot paste into windows of elevated (administrator) processes unless Paste Commander runs elevated too.
-- Some apps (games, remote-desktop clients, some terminals) ignore synthetic key events.
+- **GNOME/Wayland:** copies made in other apps are invisible to third-party apps. The XWayland fallback only sees copies that reach X11 (usually while an X11 app has focus). A GNOME Shell extension bridge is a phase-2 option.
+- **Wayland source app:** the protocol does not reveal which app copied, so "excluded apps" cannot apply there. Confidential markers still work.
+- **macOS Secure Input:** while a password field or an app with Secure Input is active, simulated ⌘V is ignored.
+- **Windows UIPI:** you cannot paste into elevated windows from a non-elevated Paste Commander.
+- **Synthetic keystrokes:** some apps (games, remote-desktop and VM clients, some terminals) ignore them. In terminals with Ctrl+Shift+V paste, Ctrl+V may do nothing.
+- **Plain text only:** clipboard restore only restores text. Images and files arrive in phase 2.
 
 ## License
 

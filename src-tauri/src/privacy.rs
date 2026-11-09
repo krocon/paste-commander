@@ -66,6 +66,8 @@ pub struct ClipboardFormat {
 }
 
 impl ClipboardFormat {
+    // Windows builds formats with data inline; tests and other watchers use this.
+    #[cfg_attr(target_os = "windows", allow(dead_code))]
     pub fn named(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),

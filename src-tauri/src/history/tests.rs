@@ -367,3 +367,34 @@ fn corrupt_file_is_moved_aside() {
         .any(|e| e.file_name().to_string_lossy().contains("corrupt-"));
     assert!(aside);
 }
+
+/// `cargo test --release -- --ignored perf_ --nocapture`
+#[test]
+#[ignore = "timing, run manually"]
+fn perf_500_entries() {
+    let dir = TempDir::new("perf");
+    let mut h = History::open(Location::File(dir.db()), 500).unwrap();
+    let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(40);
+    let t = std::time::Instant::now();
+    for i in 0..500 {
+        h.add(
+            NewEntry {
+                content: &format!("{i} {text}"),
+                source_app: Some("App"),
+            },
+            i,
+        )
+        .unwrap();
+    }
+    println!("add 500: {:?}", t.elapsed());
+    let t = std::time::Instant::now();
+    let list = h.list().unwrap();
+    println!(
+        "list 500 (summaries): {:?}, json {} KB",
+        t.elapsed(),
+        serde_json::to_vec(&list).unwrap().len() / 1024
+    );
+    let t = std::time::Instant::now();
+    let hits = h.search("ADIPISCING elit").unwrap();
+    println!("search 500: {:?} ({} hits)", t.elapsed(), hits.len());
+}

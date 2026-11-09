@@ -1,0 +1,91 @@
+name: Release
+
+# Push a tag like v1.0.0 (matching "version" in tauri.conf.json) to build,
+# sign and attach all installers to a draft GitHub release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: ${{ matrix.name }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (universal)
+            os: macos-latest
+            args: --target universal-apple-darwin
+          - name: Windows
+            os: windows-latest
+            args: ''
+          # Oldest supported runner: AppImage/deb built here run on more distros.
+          - name: Linux
+            os: ubuntu-22.04
+            args: ''
+    runs-on: ${{ matrix.os }}
+    env:
+      # Optional signing; steps below degrade to unsigned builds when unset.
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+      AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev build-essential patchelf file xdg-utils rpm
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Windows: Azure Artifact Signing (formerly Trusted Signing) when configured.
+      - name: Configure Windows signing
+        if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
+        shell: bash
+        run: |
+          cargo install trusted-signing-cli --locked
+          cmd="trusted-signing-cli -e $AZURE_SIGNING_ENDPOINT -a $AZURE_SIGNING_ACCOUNT -c $AZURE_SIGNING_PROFILE -d \"Paste Commander\" %1"
+          printf '{"bundle":{"windows":{"signCommand":"%s"}}}' "${cmd//\"/\\\"}" > src-tauri/sign.windows.json
+          echo "EXTRA_ARGS=--config src-tauri/sign.windows.json" >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Paste Commander ${{ github.ref_name }}
+          releaseBody: |
+            Installers for macOS (universal .dmg), Windows (.msi / setup .exe) and Linux (.AppImage, .deb, .rpm).
+            See the README for permissions and platform support.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }} ${{ env.EXTRA_ARGS }}

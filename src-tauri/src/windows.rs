@@ -91,6 +91,25 @@ pub fn open_settings<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     Ok(())
 }
 
+/// One-time native tweaks of the picker window, called during setup.
+pub fn configure_picker<R: Runtime>(app: &AppHandle<R>) {
+    #[cfg(target_os = "macos")]
+    if let Some(picker) = app.get_webview_window(PICKER)
+        && let Ok(ptr) = picker.ns_window()
+    {
+        use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior as B};
+        // SAFETY: Tauri hands out the live NSWindow of this webview window; we
+        // are on the main thread (setup) and only change its collection behavior.
+        let window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+        // Show on the current Space – also over full-screen apps – and keep
+        // the picker out of ⌘` window cycling.
+        window
+            .setCollectionBehavior(B::CanJoinAllSpaces | B::FullScreenAuxiliary | B::IgnoresCycle);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 /// Window-event hook registered on the builder.
 pub fn on_window_event<R: Runtime>(window: &tauri::Window<R>, event: &WindowEvent) {
     if window.label() == PICKER {

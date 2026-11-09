@@ -77,6 +77,7 @@ pub fn run() {
             log::info!("platform: {:?}", state.platform());
 
             tray::create(handle)?;
+            windows::configure_picker(handle);
             Ok(())
         })
         .on_window_event(windows::on_window_event)
