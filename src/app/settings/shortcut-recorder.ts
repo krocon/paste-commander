@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { acceleratorFromEvent, formatAccelerator } from '../core/accelerator';
+import { Backend } from '../core/backend';
 import { I18n } from '../core/i18n';
 
 @Component({
@@ -14,7 +15,7 @@ import { I18n } from '../core/i18n';
       [attr.aria-pressed]="recording()"
       (click)="toggle()"
       (keydown)="onKey($event)"
-      (blur)="recording.set(false)">
+      (blur)="stop()">
       @if (recording()) {
         <span class="hint">{{ i18n.t('recorder.recording') }}</span>
       } @else if (value()) {
@@ -27,8 +28,8 @@ import { I18n } from '../core/i18n';
       <button type="button" class="clear" (click)="valueChange.emit(null)"
               [attr.aria-label]="i18n.t('recorder.clear') + ': ' + label()">×</button>
     }
-    @if (error()) {
-      <span class="error" role="alert">{{ error() }}</span>
+    @if (error() || status()) {
+      <span class="error" role="alert">{{ error() || status() }}</span>
     }
   `,
   styles: `
@@ -52,9 +53,12 @@ import { I18n } from '../core/i18n';
 })
 export class ShortcutRecorder {
   protected readonly i18n = inject(I18n);
+  private readonly backend = inject(Backend);
 
   readonly value = input<string | null>(null);
   readonly label = input.required<string>();
+  /** Registration error reported by the backend for this shortcut. */
+  readonly status = input<string | null>(null);
   readonly valueChange = output<string | null>();
 
   protected readonly recording = signal(false);
@@ -66,7 +70,18 @@ export class ShortcutRecorder {
 
   protected toggle(): void {
     this.error.set(null);
-    this.recording.update((r) => !r);
+    if (this.recording()) this.stop();
+    else {
+      this.recording.set(true);
+      // Our own global shortcuts must not fire while recording.
+      void this.backend.suspendShortcuts(true);
+    }
+  }
+
+  protected stop(): void {
+    if (!this.recording()) return;
+    this.recording.set(false);
+    void this.backend.suspendShortcuts(false);
   }
 
   protected onKey(e: KeyboardEvent): void {
@@ -90,6 +105,6 @@ export class ShortcutRecorder {
         break;
     }
     this.error.set(null);
-    this.recording.set(false);
+    this.stop();
   }
 }

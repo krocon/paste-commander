@@ -132,6 +132,18 @@ impl Settings {
     }
 }
 
+/// True exactly once per installation (first launch), used for onboarding.
+pub fn take_first_run<R: Runtime>(app: &AppHandle<R>) -> Result<bool> {
+    const KEY: &str = "firstRunDone";
+    let store = app.store(STORE_FILE)?;
+    if store.get(KEY).is_some() {
+        return Ok(false);
+    }
+    store.set(KEY, true);
+    store.save()?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

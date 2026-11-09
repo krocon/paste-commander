@@ -4,7 +4,7 @@ Clipboard history for **macOS, Windows and Linux**. Everything you copy lands in
 
 Built with **Tauri 2 + Rust**; the UI is **Angular 22** (zoneless, signals, CSS variables). All logic lives in Rust. Everything stays local, and the app makes no network connections.
 
-> Status: **Phase 3 of 7**. Copies from other apps are now recorded on macOS, Windows, X11 and Wayland data-control compositors. Not yet implemented: the picker list, pasting and global shortcuts.
+> Status: **Phase 6 of 7**. Recording, picker, pasting into the previous app, quick paste and global shortcuts work. Release pipeline and polish follow.
 
 ## Platform matrix
 

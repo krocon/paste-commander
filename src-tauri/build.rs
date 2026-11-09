@@ -12,6 +12,10 @@ fn main() {
             "delete_entry",
             "set_pinned",
             "clear_history",
+            "paste_entry",
+            "open_accessibility_settings",
+            "get_shortcut_status",
+            "suspend_shortcuts",
         ]),
     ))
     .expect("failed to run tauri-build");

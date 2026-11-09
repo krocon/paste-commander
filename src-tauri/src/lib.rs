@@ -1,19 +1,16 @@
 //! Paste Commander – clipboard history for macOS, Windows and Linux.
 //!
 //! All logic lives in Rust; the Angular webview only renders and calls commands.
-//! Planned modules (later phases): `paste`, `hotkeys`, platform watchers.
-//!
-//! `allow(dead_code)` below: parts of these modules are only called by the
-//! watchers and the paste service (phases 3–5). Remove the allows then.
 
+mod clipboard;
 mod commands;
 mod error;
-#[allow(dead_code)]
 mod history;
+mod hotkeys;
 mod i18n;
 mod ingest;
+mod paste;
 mod platform;
-#[allow(dead_code)]
 mod privacy;
 mod settings;
 mod state;
@@ -45,6 +42,12 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(hotkeys::plugin_handler)
+                .build(),
+        )
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
@@ -60,10 +63,17 @@ pub fn run() {
             if let Ok(enabled) = handle.autolaunch().is_enabled() {
                 settings.launch_at_login = enabled;
             }
-            let state = AppState::new(settings, state::history_file(handle)?);
+            let state = AppState::new(handle, settings, state::history_file(handle)?);
             app.manage(state);
             let state = app.state::<AppState>();
             state.start_watcher(handle);
+            hotkeys::apply(handle, &state.settings());
+
+            // First launch: explain what the app needs. On macOS without
+            // Accessibility the settings window opens on the platform page.
+            if settings::take_first_run(handle)? && !paste::accessibility_trusted() {
+                windows::open_settings(handle)?;
+            }
             log::info!("platform: {:?}", state.platform());
 
             tray::create(handle)?;
@@ -80,6 +90,10 @@ pub fn run() {
             commands::delete_entry,
             commands::set_pinned,
             commands::clear_history,
+            commands::paste_entry,
+            commands::open_accessibility_settings,
+            commands::get_shortcut_status,
+            commands::suspend_shortcuts,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Paste Commander");

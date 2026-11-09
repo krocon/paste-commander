@@ -379,6 +379,7 @@ impl History {
         self.trim()
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> Result<usize> {
         let n: i64 = self
             .conn

@@ -6,6 +6,8 @@ use tauri_plugin_autostart::ManagerExt;
 
 use crate::error::{Error, Result};
 use crate::history::EntrySummary;
+use crate::hotkeys::{self, ShortcutStatus};
+use crate::paste::{self, Origin, PasteOutcome};
 use crate::platform::PlatformInfo;
 use crate::settings::Settings;
 use crate::state::{AppState, HISTORY_CHANGED};
@@ -41,6 +43,9 @@ pub fn update_settings<R: Runtime>(
 
     if new.language != old.language {
         tray::refresh(&app)?;
+    }
+    if new.shortcuts != old.shortcuts || new.language != old.language {
+        hotkeys::apply(&app, &new);
     }
     app.emit(SETTINGS_CHANGED, &new)?;
     Ok(new)
@@ -105,6 +110,28 @@ pub fn clear_history<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) 
     let removed = state.history().clear(true)?;
     app.emit(HISTORY_CHANGED, ())?;
     Ok(removed)
+}
+
+/// Pastes (or, where impossible, copies) an entry chosen in the picker.
+#[tauri::command]
+pub fn paste_entry<R: Runtime>(app: AppHandle<R>, id: i64) -> Result<PasteOutcome> {
+    paste::paste_entry(&app, id, Origin::Picker)
+}
+
+#[tauri::command]
+pub fn open_accessibility_settings() {
+    paste::open_accessibility_settings();
+}
+
+#[tauri::command]
+pub fn get_shortcut_status(state: State<'_, AppState>) -> Vec<ShortcutStatus> {
+    state.hotkeys.status()
+}
+
+/// Pauses global shortcuts while the settings window records a new one.
+#[tauri::command]
+pub fn suspend_shortcuts<R: Runtime>(app: AppHandle<R>, suspended: bool) {
+    hotkeys::suspend(&app, suspended);
 }
 
 pub fn apply_autostart<R: Runtime>(app: &AppHandle<R>, enabled: bool) -> Result<()> {

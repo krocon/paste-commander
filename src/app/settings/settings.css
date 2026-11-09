@@ -78,3 +78,10 @@ code { font-family: var(--pc-font-mono); font-size: var(--pc-font-size-sm); }
 .badge[data-support='supported'] { --c: var(--pc-ok); }
 .badge[data-support='limited'] { --c: var(--pc-warn); }
 .badge[data-support='unsupported'] { --c: var(--pc-error); }
+
+.callout {
+  margin: 0 0 var(--pc-space-4); padding: var(--pc-space-3) var(--pc-space-4);
+  border-radius: var(--pc-radius); background: color-mix(in srgb, var(--pc-warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pc-warn) 35%, transparent);
+}
+.callout p { margin: var(--pc-space-1) 0 var(--pc-space-3); color: var(--pc-fg-muted); }

@@ -16,6 +16,10 @@
     "allow-get-history",
     "allow-delete-entry",
     "allow-set-pinned",
-    "allow-clear-history"
+    "allow-clear-history",
+    "allow-paste-entry",
+    "allow-open-accessibility-settings",
+    "allow-get-shortcut-status",
+    "allow-suspend-shortcuts"
   ]
 }

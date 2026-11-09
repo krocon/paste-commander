@@ -41,6 +41,8 @@ export interface PlatformInfo {
   pasteSimulation: Capability;
   /** Watcher actually running, e.g. `wayland-data-control`. */
   clipboardBackend: string | null;
+  /** macOS Accessibility permission; null on other platforms. */
+  accessibilityGranted: boolean | null;
 }
 
 export type EntryKind = 'text';
@@ -57,4 +59,20 @@ export interface EntrySummary {
   createdAt: number;
   copiedAt: number;
   pinned: boolean;
+}
+
+export type CopyReason = 'noAccessibility' | 'unsupported';
+
+export type PasteOutcome =
+  | { kind: 'pasted' }
+  | { kind: 'copied'; reason: CopyReason }
+  | { kind: 'missing' };
+
+export type ShortcutAction = { kind: 'picker' } | { kind: 'quickPaste'; position: number };
+
+export interface ShortcutStatus {
+  action: ShortcutAction;
+  accelerator: string;
+  /** Registration error (taken by another app, invalid, no portal …). */
+  error: string | null;
 }

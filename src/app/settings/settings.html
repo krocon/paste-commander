@@ -72,10 +72,14 @@
 
       @case ('shortcuts') {
         <h1>{{ i18n.t('settings.shortcuts') }}</h1>
+        @if (backend.platform()?.displayServer === 'wayland') {
+          <p class="hint">{{ i18n.t('settings.portalShortcutsHint') }}</p>
+        }
         <div class="group">
           <div class="row">
             <span>{{ i18n.t('settings.pickerShortcut') }}</span>
             <pc-shortcut-recorder [label]="i18n.t('settings.pickerShortcut')" [value]="s.shortcuts.picker"
+                                  [status]="shortcutError({ kind: 'picker' })"
                                   (valueChange)="patch(d => d.shortcuts.picker = $event)" />
           </div>
         </div>
@@ -85,6 +89,7 @@
             <div class="row">
               <span>{{ i18n.t('settings.quickPaste', { n: slot.position }) }}</span>
               <pc-shortcut-recorder [label]="i18n.t('settings.quickPaste', { n: slot.position })" [value]="slot.value"
+                                    [status]="shortcutError({ kind: 'quickPaste', position: slot.position })"
                                     (valueChange)="setQuickPaste(i, $event)" />
             </div>
           }
@@ -119,6 +124,13 @@
       @case ('platform') {
         <h1>{{ i18n.t('settings.platform') }}</h1>
         @if (backend.platform(); as p) {
+          @if (p.accessibilityGranted === false) {
+            <div class="callout" role="alert">
+              <strong>{{ i18n.t('platform.accessibilityTitle') }}</strong>
+              <p>{{ i18n.t('platform.accessibilityText') }}</p>
+              <button type="button" class="btn" (click)="backend.openAccessibilitySettings()">{{ i18n.t('platform.accessibilityButton') }}</button>
+            </div>
+          }
           <dl class="group facts">
             <div class="row"><dt>{{ i18n.t('platform.os') }}</dt><dd>{{ p.os }} · {{ p.arch }}</dd></div>
             @if (p.os === 'linux') {
@@ -126,6 +138,10 @@
               <div class="row"><dt>{{ i18n.t('platform.desktop') }}</dt><dd>{{ p.desktop ?? '–' }}</dd></div>
             }
             <div class="row"><dt>{{ i18n.t('platform.backend') }}</dt><dd>{{ p.clipboardBackend ?? '–' }}</dd></div>
+            @if (p.accessibilityGranted !== null) {
+              <div class="row"><dt>{{ i18n.t('platform.accessibility') }}</dt>
+                <dd>{{ p.accessibilityGranted ? i18n.t('platform.granted') : i18n.t('platform.notGranted') }}</dd></div>
+            }
           </dl>
           <ul class="group caps">
             @for (row of capabilities(); track row.key) {

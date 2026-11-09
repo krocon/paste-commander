@@ -24,6 +24,7 @@ pub mod windows {
     /// DWORD; 0 means "do not sync to cloud clipboard".
     pub const CAN_UPLOAD_TO_CLOUD: &str = "CanUploadToCloudClipboard";
     /// Formats whose data the watcher must read and pass on.
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub const DATA_FORMATS: [&str; 2] = [CAN_INCLUDE_IN_HISTORY, CAN_UPLOAD_TO_CLOUD];
 }
 
@@ -31,6 +32,7 @@ pub mod windows {
 pub mod linux {
     pub const PASSWORD_HINT: &str = "x-kde-passwordManagerHint";
     pub const PASSWORD_HINT_SECRET: &[u8] = b"secret";
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub const DATA_FORMATS: [&str; 1] = [PASSWORD_HINT];
 }
 
@@ -70,6 +72,7 @@ impl ClipboardFormat {
             data: None,
         }
     }
+    #[cfg(test)]
     pub fn with_data(name: impl Into<String>, data: impl Into<Vec<u8>>) -> Self {
         Self {
             name: name.into(),

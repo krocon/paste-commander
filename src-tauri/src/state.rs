@@ -4,11 +4,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+use crate::clipboard::ClipboardWriter;
 use crate::history::{self, History, Location};
+use crate::hotkeys::Hotkeys;
 use crate::i18n::Lang;
 use crate::ingest::{self, IngestContext, IngestOutcome, SelfWriteGuard};
+use crate::paste::{FocusTarget, PasteService};
 use crate::platform::PlatformInfo;
-use crate::privacy::ClipboardSnapshot;
+use crate::privacy::{ClipboardSnapshot, RejectReason};
 use crate::settings::Settings;
 use crate::watcher::{self, Sink, WatcherHandle};
 
@@ -20,8 +23,15 @@ pub struct AppState {
     pub paused: AtomicBool,
     platform: Mutex<PlatformInfo>,
     pub history: Mutex<History>,
-    /// Lets the paste service (phase 5) mark its own clipboard writes.
+    /// Marks our own clipboard writes so the watcher ignores their echo.
     pub self_writes: SelfWriteGuard,
+    pub clipboard: ClipboardWriter,
+    pub paste: PasteService,
+    pub hotkeys: Hotkeys,
+    /// The last external copy was concealed or from an excluded app; such a
+    /// clipboard is never restored after pasting.
+    pub last_copy_was_private: AtomicBool,
+    previous_focus: Mutex<Option<FocusTarget>>,
     watcher: Mutex<Option<WatcherHandle>>,
     history_file: PathBuf,
 }
@@ -32,7 +42,8 @@ pub fn history_file<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<PathBuf> {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, history_file: PathBuf) -> Self {
+    pub fn new<R: Runtime>(app: &AppHandle<R>, settings: Settings, history_file: PathBuf) -> Self {
+        let platform = PlatformInfo::detect();
         let location = if settings.persist_history {
             Location::File(history_file.clone())
         } else {
@@ -44,9 +55,14 @@ impl AppState {
         Self {
             settings: Mutex::new(settings),
             paused: AtomicBool::new(false),
-            platform: Mutex::new(PlatformInfo::detect()),
+            paste: PasteService::start(app.clone(), platform.display_server),
+            platform: Mutex::new(platform),
             history: Mutex::new(history),
             self_writes: SelfWriteGuard::default(),
+            clipboard: ClipboardWriter::default(),
+            hotkeys: Hotkeys::default(),
+            last_copy_was_private: AtomicBool::new(false),
+            previous_focus: Mutex::new(None),
             watcher: Mutex::new(None),
             history_file,
         }
@@ -68,8 +84,19 @@ impl AppState {
         self.paused.store(paused, Ordering::Relaxed);
     }
 
+    /// Snapshot of the platform info with the current permission status.
     pub fn platform(&self) -> PlatformInfo {
-        lock(&self.platform).clone()
+        let mut info = lock(&self.platform).clone();
+        info.refresh_permissions();
+        info
+    }
+
+    pub fn set_previous_focus(&self, target: Option<FocusTarget>) {
+        *lock(&self.previous_focus) = target;
+    }
+
+    pub fn take_previous_focus(&self) -> Option<FocusTarget> {
+        lock(&self.previous_focus).take()
     }
 
     /// Starts the clipboard watcher; every change goes through [`Self::handle_snapshot`].
@@ -135,10 +162,15 @@ impl AppState {
         };
         let outcome = ingest::ingest(snapshot, &mut self.history(), &self.self_writes, ctx);
         match outcome {
-            Ok(o) if o.changed_history() => {
-                let _ = app.emit(HISTORY_CHANGED, ());
+            Ok(IngestOutcome::Stored(_)) => {
+                self.last_copy_was_private.store(false, Ordering::Relaxed);
+                if outcome.as_ref().is_ok_and(|o| o.changed_history()) {
+                    let _ = app.emit(HISTORY_CHANGED, ());
+                }
             }
             Ok(IngestOutcome::Rejected(reason)) => {
+                let private = !matches!(reason, RejectReason::NoText);
+                self.last_copy_was_private.store(private, Ordering::Relaxed);
                 log::debug!("clipboard change rejected: {reason:?}")
             }
             Ok(_) => {}

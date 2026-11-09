@@ -1,0 +1,77 @@
+<section class="panel" [attr.aria-label]="i18n.t('app.name')">
+  <header>
+    <input #search type="search" class="search" role="combobox" aria-expanded="true"
+           aria-controls="pc-history" aria-autocomplete="list"
+           [attr.aria-activedescendant]="activeId()"
+           [attr.aria-label]="i18n.t('picker.search')"
+           [placeholder]="i18n.t('picker.searchPlaceholder')"
+           [value]="query()" (input)="onQuery($any($event.target).value)"
+           spellcheck="false" autocomplete="off">
+    @if (backend.paused()) {
+      <span class="paused">{{ i18n.t('picker.paused') }}</span>
+    }
+    <button type="button" class="icon" (click)="backend.openSettings()" [attr.aria-label]="i18n.t('picker.settings')">⚙︎</button>
+  </header>
+
+  @if (copiedHint(); as hint) {
+    <div class="hint" role="status">
+      <strong>{{ i18n.t('picker.copied', { keys: pasteKeys }) }}</strong>
+      @if (hint.accessibility) {
+        <span>{{ i18n.t('picker.needAccessibility') }}</span>
+        <button type="button" class="btn" (click)="grantAccessibility()">{{ i18n.t('picker.grant') }}</button>
+      }
+    </div>
+  }
+
+  <ul #list id="pc-history" role="listbox" class="list" [attr.aria-label]="i18n.t('picker.search')">
+    @for (entry of rows(); track entry.id; let i = $index) {
+      <li class="row" role="option"
+          [id]="'pc-entry-' + entry.id"
+          [class.selected]="i === selected()"
+          [attr.aria-selected]="i === selected()"
+          (mousemove)="selected.set(i)"
+          (click)="paste(i)">
+        <span class="index" aria-hidden="true">{{ i < 9 ? mod + (i + 1) : '' }}</span>
+        <div class="body">
+          <div class="preview">{{ entry.preview }}</div>
+          <div class="meta">
+            @if (entry.pinned) {
+              <span class="pin-badge">📌 {{ i18n.t('picker.pinned') }}</span>
+            }
+            @if (entry.sourceApp) {
+              <span>{{ entry.sourceApp }}</span>
+            }
+            <span>{{ rel(entry.copiedAt) }}</span>
+            @if (entry.chars > entry.preview.length) {
+              <span>{{ i18n.t('picker.more', { n: entry.chars - entry.preview.length }) }}</span>
+            }
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="icon" tabindex="-1"
+                  [attr.aria-label]="entry.pinned ? i18n.t('picker.unpin') : i18n.t('picker.pin')"
+                  [class.on]="entry.pinned"
+                  (click)="$event.stopPropagation(); togglePin(entry)">📌</button>
+          <button type="button" class="icon danger" tabindex="-1"
+                  [attr.aria-label]="i18n.t('picker.delete')"
+                  (click)="$event.stopPropagation(); remove(entry)">✕</button>
+        </div>
+      </li>
+    } @empty {
+      <li class="empty" role="presentation">
+        <strong>{{ query() ? i18n.t('picker.noMatches') : i18n.t('picker.empty') }}</strong>
+        @if (!query()) {
+          <span>{{ i18n.t('picker.emptyHint') }}</span>
+        }
+      </li>
+    }
+  </ul>
+
+  <footer aria-hidden="true">
+    <span><kbd>⏎</kbd> {{ i18n.t('picker.footer.paste') }}</span>
+    <span><kbd>{{ mod }}1–9</kbd></span>
+    <span><kbd>{{ mod }}P</kbd> {{ i18n.t('picker.footer.pin') }}</span>
+    <span><kbd>{{ i18n.t('picker.footer.delKey') }}</kbd> {{ i18n.t('picker.footer.delete') }}</span>
+    <span><kbd>Esc</kbd> {{ i18n.t('picker.footer.close') }}</span>
+  </footer>
+</section>

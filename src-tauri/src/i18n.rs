@@ -33,6 +33,11 @@ pub struct Strings {
     pub quit: &'static str,
     pub settings_title: &'static str,
     pub tooltip_paused: &'static str,
+    pub copied_no_accessibility: &'static str,
+    pub copied_press_paste: &'static str,
+    /// Shortcut description shown by the Wayland GlobalShortcuts portal.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub quick_paste_entry: &'static str,
 }
 
 pub fn strings(lang: Lang) -> &'static Strings {
@@ -45,6 +50,9 @@ pub fn strings(lang: Lang) -> &'static Strings {
             quit: "Paste Commander beenden",
             settings_title: "Paste Commander – Einstellungen",
             tooltip_paused: "Paste Commander (pausiert)",
+            copied_no_accessibility: "Kopiert – mit ⌘V einfügen. Für direktes Einfügen Paste Commander unter Bedienungshilfen freigeben.",
+            copied_press_paste: "Kopiert – mit Strg+V einfügen.",
+            quick_paste_entry: "Eintrag einfügen:",
         },
         Lang::En => &Strings {
             open_history: "Open History",
@@ -54,6 +62,9 @@ pub fn strings(lang: Lang) -> &'static Strings {
             quit: "Quit Paste Commander",
             settings_title: "Paste Commander – Settings",
             tooltip_paused: "Paste Commander (paused)",
+            copied_no_accessibility: "Copied – press ⌘V to paste. Allow Paste Commander under Accessibility to paste directly.",
+            copied_press_paste: "Copied – press Ctrl+V to paste.",
+            quick_paste_entry: "Paste entry",
         },
     }
 }

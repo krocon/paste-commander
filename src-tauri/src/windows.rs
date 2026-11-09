@@ -1,8 +1,8 @@
 //! Picker (pre-created, only shown/hidden) and settings (created on demand) windows.
 
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, Runtime, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 
 use crate::error::Result;
@@ -11,6 +11,8 @@ use crate::state::AppState;
 
 pub const PICKER: &str = "picker";
 pub const SETTINGS: &str = "settings";
+/// Sent to the picker each time it is shown: reload list, reset search.
+pub const PICKER_SHOWN: &str = "picker-shown";
 
 /// Centers the picker on the monitor under the mouse and focuses it.
 pub fn show_picker<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
@@ -18,10 +20,25 @@ pub fn show_picker<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
         log::error!("picker window missing");
         return Ok(());
     };
-    center_on_cursor_monitor(app, &picker)?;
+    if !picker.is_visible()? {
+        // Remember who had focus, so pasting can hand it back.
+        let state = app.state::<AppState>();
+        let display = state.platform().display_server;
+        state.set_previous_focus(crate::paste::focus::capture(display));
+        center_on_cursor_monitor(app, &picker)?;
+    }
     picker.show()?;
     picker.set_focus()?;
+    picker.emit(PICKER_SHOWN, ())?;
     Ok(())
+}
+
+/// Picker shortcut: opens the picker, or closes it if it is already in front.
+pub fn toggle_picker<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+    match app.get_webview_window(PICKER) {
+        Some(p) if p.is_visible()? && p.is_focused()? => hide_picker(app),
+        _ => show_picker(app),
+    }
 }
 
 pub fn hide_picker<R: Runtime>(app: &AppHandle<R>) -> Result<()> {

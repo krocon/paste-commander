@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Backend } from '../core/backend';
 import { I18n, I18nKey } from '../core/i18n';
-import { Capability, HISTORY_LIMIT_MAX, HISTORY_LIMIT_MIN, Language, Settings } from '../core/models';
+import {
+  Capability, HISTORY_LIMIT_MAX, HISTORY_LIMIT_MIN, Language, Settings, ShortcutAction,
+} from '../core/models';
 import { ShortcutRecorder } from './shortcut-recorder';
 
 type Section = 'general' | 'shortcuts' | 'privacy' | 'platform';
@@ -11,6 +13,7 @@ type Section = 'general' | 'shortcuts' | 'privacy' | 'platform';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ShortcutRecorder],
   templateUrl: './settings.html',
+  host: { '(window:focus)': 'backend.refreshPlatform()' },
   styleUrl: './settings.css',
 })
 export class SettingsPage {
@@ -47,6 +50,24 @@ export class SettingsPage {
   });
 
   private statusTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    // First thing a macOS user without Accessibility permission should see.
+    let decided = false;
+    effect(() => {
+      const p = this.backend.platform();
+      if (!p || decided) return;
+      decided = true;
+      if (p.accessibilityGranted === false) untracked(() => this.section.set('platform'));
+    });
+  }
+
+  protected shortcutError(action: ShortcutAction): string | null {
+    const match = this.backend
+      .shortcutStatus()
+      .find((s) => s.action.kind === action.kind && (action.kind === 'picker' || (s.action.kind === 'quickPaste' && s.action.position === action.position)));
+    return match?.error ?? null;
+  }
 
   protected async patch(change: (draft: Settings) => void): Promise<void> {
     const current = this.s();

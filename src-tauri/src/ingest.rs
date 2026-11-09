@@ -6,9 +6,7 @@ use std::time::{Duration, Instant};
 use crate::history::{AddOutcome, History, NewEntry, Result};
 use crate::privacy::{self, ClipboardSnapshot, RejectReason};
 
-// The paste service (phase 5) is the only caller of `SelfWriteGuard::expect`.
 /// How long after our own clipboard write a matching change is attributed to us.
-#[allow(dead_code)]
 const SELF_WRITE_TTL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,7 +35,6 @@ pub struct SelfWriteGuard {
     pending: Mutex<Option<(String, Instant)>>,
 }
 
-#[allow(dead_code)]
 impl SelfWriteGuard {
     pub fn expect(&self, text: &str) {
         self.expect_at(text, Instant::now());

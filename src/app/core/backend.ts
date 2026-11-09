@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { EntrySummary, PlatformInfo, Settings } from './models';
+import type { EntrySummary, PasteOutcome, PlatformInfo, Settings, ShortcutStatus } from './models';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -11,10 +11,12 @@ export class Backend {
   private readonly _settings = signal<Settings | null>(null);
   private readonly _platform = signal<PlatformInfo | null>(null);
   private readonly _paused = signal(false);
+  private readonly _shortcuts = signal<ShortcutStatus[]>([]);
 
   readonly settings = this._settings.asReadonly();
   readonly platform = this._platform.asReadonly();
   readonly paused = this._paused.asReadonly();
+  readonly shortcutStatus = this._shortcuts.asReadonly();
 
   constructor() {
     if (!isTauri) return;
@@ -22,6 +24,7 @@ export class Backend {
     const unlisteners = [
       listen<Settings>('settings-changed', (e) => this._settings.set(e.payload)),
       listen<boolean>('paused-changed', (e) => this._paused.set(e.payload)),
+      listen<ShortcutStatus[]>('shortcuts-changed', (e) => this._shortcuts.set(e.payload)),
     ];
     destroyRef.onDestroy(() => unlisteners.forEach((p) => p.then((off) => off())));
 
@@ -29,12 +32,19 @@ export class Backend {
   }
 
   async reload(): Promise<void> {
-    const [settings, platform] = await Promise.all([
+    const [settings, platform, shortcuts] = await Promise.all([
       invoke<Settings>('get_settings'),
       invoke<PlatformInfo>('get_platform_info'),
+      invoke<ShortcutStatus[]>('get_shortcut_status'),
     ]);
     this._settings.set(settings);
     this._platform.set(platform);
+    this._shortcuts.set(shortcuts);
+  }
+
+  /** Re-reads permission status (e.g. after granting Accessibility). */
+  async refreshPlatform(): Promise<void> {
+    if (isTauri) this._platform.set(await invoke<PlatformInfo>('get_platform_info'));
   }
 
   /** Persists settings; the backend sanitizes and returns the stored version. */
@@ -63,6 +73,23 @@ export class Backend {
   /** Fires (without payload) whenever entries change. */
   onHistoryChanged(handler: () => void): Promise<() => void> {
     return isTauri ? listen('history-changed', handler) : Promise.resolve(() => {});
+  }
+
+  pasteEntry(id: number): Promise<PasteOutcome> {
+    return invoke<PasteOutcome>('paste_entry', { id });
+  }
+
+  suspendShortcuts(suspended: boolean): Promise<void> {
+    return isTauri ? invoke('suspend_shortcuts', { suspended }) : Promise.resolve();
+  }
+
+  openAccessibilitySettings(): Promise<void> {
+    return invoke('open_accessibility_settings');
+  }
+
+  /** Fires each time the picker window is shown. */
+  onPickerShown(handler: () => void): Promise<() => void> {
+    return isTauri ? listen('picker-shown', handler) : Promise.resolve(() => {});
   }
 
   hidePicker(): Promise<void> {

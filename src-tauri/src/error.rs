@@ -10,6 +10,8 @@ pub enum Error {
     Autostart(String),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error("clipboard: {0}")]
+    Clipboard(String),
     #[error("history: {0}")]
     History(#[from] crate::history::HistoryError),
 }

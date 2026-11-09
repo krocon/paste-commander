@@ -76,6 +76,8 @@ pub struct PlatformInfo {
     pub paste_simulation: Capability,
     /// Watcher implementation actually running, e.g. `wayland-data-control`.
     pub clipboard_backend: Option<&'static str>,
+    /// macOS Accessibility permission (needed to send ⌘V); `None` elsewhere.
+    pub accessibility_granted: Option<bool>,
 }
 
 impl PlatformInfo {
@@ -99,6 +101,19 @@ impl PlatformInfo {
                     self.clipboard_watch = Capability::no("platform.note.watcherFailed");
                 }
             }
+        }
+    }
+
+    /// Permissions can change while the app runs (user grants Accessibility).
+    pub fn refresh_permissions(&mut self) {
+        if self.os == Os::Macos {
+            let granted = crate::paste::accessibility_trusted();
+            self.accessibility_granted = Some(granted);
+            self.paste_simulation = if granted {
+                Capability::ok()
+            } else {
+                Capability::limited("platform.note.macAccessibility")
+            };
         }
     }
 
@@ -182,6 +197,7 @@ fn detect_with(os: Os, arch: &'static str, env: impl Fn(&str) -> Option<String>)
         global_shortcuts,
         paste_simulation,
         clipboard_backend: None,
+        accessibility_granted: None,
     }
 }
 
