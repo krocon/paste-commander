@@ -125,6 +125,7 @@
               <div class="row"><dt>{{ i18n.t('platform.session') }}</dt><dd>{{ p.displayServer }}</dd></div>
               <div class="row"><dt>{{ i18n.t('platform.desktop') }}</dt><dd>{{ p.desktop ?? '–' }}</dd></div>
             }
+            <div class="row"><dt>{{ i18n.t('platform.backend') }}</dt><dd>{{ p.clipboardBackend ?? '–' }}</dd></div>
           </dl>
           <ul class="group caps">
             @for (row of capabilities(); track row.key) {

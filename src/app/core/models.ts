@@ -39,6 +39,8 @@ export interface PlatformInfo {
   clipboardWatch: Capability;
   globalShortcuts: Capability;
   pasteSimulation: Capability;
+  /** Watcher actually running, e.g. `wayland-data-control`. */
+  clipboardBackend: string | null;
 }
 
 export type EntryKind = 'text';

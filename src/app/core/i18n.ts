@@ -64,6 +64,9 @@ const de = {
   'platform.note.portalShortcuts': 'Über das XDG-Portal „GlobalShortcuts“; der Desktop fragt beim ersten Start nach Erlaubnis.',
   'platform.note.waylandPaste': 'Über das XDG-Portal „RemoteDesktop“ bzw. virtuelle Tastatur; sonst wird nur kopiert und Strg+V bleibt bei dir.',
   'platform.note.unknownSession': 'Keine grafische Sitzung erkannt.',
+  'platform.note.xwaylandFallback': 'Dieser Compositor bietet kein Data-Control. Notlösung über XWayland: Kopien werden meist nur erkannt, während ein X11-Fenster den Fokus hat.',
+  'platform.note.watcherFailed': 'Die Überwachung der Zwischenablage konnte nicht gestartet werden (Details im Log).',
+  'platform.backend': 'Mechanismus',
 } as const;
 
 export type I18nKey = keyof typeof de;
@@ -132,6 +135,9 @@ const en: Catalog = {
   'platform.note.portalShortcuts': 'Via the XDG “GlobalShortcuts” portal; the desktop asks for permission on first use.',
   'platform.note.waylandPaste': 'Via the XDG “RemoteDesktop” portal or a virtual keyboard; otherwise the entry is copied and you press Ctrl+V.',
   'platform.note.unknownSession': 'No graphical session detected.',
+  'platform.note.xwaylandFallback': 'This compositor offers no data-control protocol. Fallback via XWayland: copies are usually only seen while an X11 window has focus.',
+  'platform.note.watcherFailed': 'Clipboard monitoring could not be started (see log for details).',
+  'platform.backend': 'Mechanism',
 };
 
 const catalogs = { de, en } satisfies Record<'de' | 'en', Catalog>;

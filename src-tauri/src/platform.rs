@@ -74,9 +74,34 @@ pub struct PlatformInfo {
     pub clipboard_watch: Capability,
     pub global_shortcuts: Capability,
     pub paste_simulation: Capability,
+    /// Watcher implementation actually running, e.g. `wayland-data-control`.
+    pub clipboard_backend: Option<&'static str>,
 }
 
 impl PlatformInfo {
+    /// Replaces the environment-based guess with what actually happened when
+    /// the clipboard watcher was started.
+    pub fn record_watcher(&mut self, outcome: Result<crate::watcher::Backend, String>) {
+        use crate::watcher::Backend;
+        match outcome {
+            Ok(Backend::Native(name)) => {
+                self.clipboard_backend = Some(name);
+                self.clipboard_watch = Capability::ok();
+            }
+            Ok(Backend::XWaylandFallback) => {
+                self.clipboard_backend = Some("xwayland-xfixes");
+                self.clipboard_watch = Capability::limited("platform.note.xwaylandFallback");
+            }
+            Err(e) => {
+                self.clipboard_backend = None;
+                if self.clipboard_watch.support != Support::Unsupported {
+                    log::error!("no clipboard watcher: {e}");
+                    self.clipboard_watch = Capability::no("platform.note.watcherFailed");
+                }
+            }
+        }
+    }
+
     pub fn detect() -> Self {
         detect_with(current_os(), std::env::consts::ARCH, |k| {
             std::env::var(k).ok()
@@ -156,6 +181,7 @@ fn detect_with(os: Os, arch: &'static str, env: impl Fn(&str) -> Option<String>)
         clipboard_watch,
         global_shortcuts,
         paste_simulation,
+        clipboard_backend: None,
     }
 }
 
@@ -220,6 +246,33 @@ mod tests {
         // XWayland sets DISPLAY inside a Wayland session.
         let p = linux(&[("XDG_SESSION_TYPE", "wayland"), ("DISPLAY", ":0")]);
         assert_eq!(p.display_server, DisplayServer::Wayland);
+    }
+
+    #[test]
+    fn watcher_outcome_overrides_guess() {
+        use crate::watcher::Backend;
+        let mut kde = linux(&[
+            ("XDG_SESSION_TYPE", "wayland"),
+            ("XDG_CURRENT_DESKTOP", "KDE"),
+        ]);
+        kde.record_watcher(Ok(Backend::Native("wayland-data-control")));
+        assert_eq!(kde.clipboard_watch.support, Support::Supported);
+        assert_eq!(kde.clipboard_backend, Some("wayland-data-control"));
+
+        let mut gnome = linux(&[
+            ("XDG_SESSION_TYPE", "wayland"),
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+        ]);
+        gnome.record_watcher(Ok(Backend::XWaylandFallback));
+        assert_eq!(gnome.clipboard_watch.support, Support::Limited);
+
+        let mut failed = linux(&[("XDG_SESSION_TYPE", "x11")]);
+        failed.record_watcher(Err("boom".into()));
+        assert_eq!(failed.clipboard_watch.support, Support::Unsupported);
+        assert_eq!(
+            failed.clipboard_watch.note,
+            Some("platform.note.watcherFailed")
+        );
     }
 
     #[test]

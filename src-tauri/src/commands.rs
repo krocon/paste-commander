@@ -48,7 +48,7 @@ pub fn update_settings<R: Runtime>(
 
 #[tauri::command]
 pub fn get_platform_info(state: State<'_, AppState>) -> PlatformInfo {
-    state.platform.clone()
+    state.platform()
 }
 
 #[tauri::command]

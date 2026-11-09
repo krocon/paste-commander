@@ -35,7 +35,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
-            libxdo-dev libssl-dev build-essential
+            libxdo-dev libssl-dev build-essential \
+            xvfb xauth xclip sway
 
       - uses: actions/setup-node@v7
         with:
@@ -71,6 +72,10 @@ jobs:
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test --locked
+
+      - name: Clipboard watcher integration tests (Xvfb + headless sway)
+        if: runner.os == 'Linux'
+        run: scripts/linux-watcher-tests.sh
 
       - name: Tauri build (no bundle)
         run: npx tauri build --no-bundle

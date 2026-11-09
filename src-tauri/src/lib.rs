@@ -11,7 +11,6 @@ mod error;
 #[allow(dead_code)]
 mod history;
 mod i18n;
-#[allow(dead_code)]
 mod ingest;
 mod platform;
 #[allow(dead_code)]
@@ -19,7 +18,6 @@ mod privacy;
 mod settings;
 mod state;
 mod tray;
-#[allow(dead_code)]
 mod watcher;
 mod windows;
 
@@ -63,8 +61,10 @@ pub fn run() {
                 settings.launch_at_login = enabled;
             }
             let state = AppState::new(settings, state::history_file(handle)?);
-            log::info!("platform: {:?}", state.platform);
             app.manage(state);
+            let state = app.state::<AppState>();
+            state.start_watcher(handle);
+            log::info!("platform: {:?}", state.platform());
 
             tray::create(handle)?;
             Ok(())
@@ -100,6 +100,7 @@ fn on_exit<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
+    state.stop_watcher();
     let settings = state.settings();
     if settings.persist_history && settings.clear_history_on_exit {
         match state.history().clear(true) {

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -10,6 +10,7 @@ use crate::ingest::{self, IngestContext, IngestOutcome, SelfWriteGuard};
 use crate::platform::PlatformInfo;
 use crate::privacy::ClipboardSnapshot;
 use crate::settings::Settings;
+use crate::watcher::{self, Sink, WatcherHandle};
 
 /// Emitted (without payload) whenever entries change; the picker refetches.
 pub const HISTORY_CHANGED: &str = "history-changed";
@@ -17,11 +18,11 @@ pub const HISTORY_CHANGED: &str = "history-changed";
 pub struct AppState {
     pub settings: Mutex<Settings>,
     pub paused: AtomicBool,
-    pub platform: PlatformInfo,
+    platform: Mutex<PlatformInfo>,
     pub history: Mutex<History>,
     /// Lets the paste service (phase 5) mark its own clipboard writes.
-    #[allow(dead_code)]
     pub self_writes: SelfWriteGuard,
+    watcher: Mutex<Option<WatcherHandle>>,
     history_file: PathBuf,
 }
 
@@ -43,9 +44,10 @@ impl AppState {
         Self {
             settings: Mutex::new(settings),
             paused: AtomicBool::new(false),
-            platform: PlatformInfo::detect(),
+            platform: Mutex::new(PlatformInfo::detect()),
             history: Mutex::new(history),
             self_writes: SelfWriteGuard::default(),
+            watcher: Mutex::new(None),
             history_file,
         }
     }
@@ -64,6 +66,35 @@ impl AppState {
 
     pub fn set_paused(&self, paused: bool) {
         self.paused.store(paused, Ordering::Relaxed);
+    }
+
+    pub fn platform(&self) -> PlatformInfo {
+        lock(&self.platform).clone()
+    }
+
+    /// Starts the clipboard watcher; every change goes through [`Self::handle_snapshot`].
+    pub fn start_watcher<R: Runtime>(&self, app: &AppHandle<R>) {
+        let sink: Sink = {
+            let app = app.clone();
+            Arc::new(move |snapshot| {
+                let state = app.state::<AppState>();
+                state.handle_snapshot(&app, &snapshot);
+            })
+        };
+        let display = lock(&self.platform).display_server;
+        let outcome = match watcher::start_best(display, sink) {
+            Ok((handle, backend)) => {
+                *lock(&self.watcher) = Some(handle);
+                Ok(backend)
+            }
+            Err(e) => Err(e.to_string()),
+        };
+        lock(&self.platform).record_watcher(outcome);
+    }
+
+    /// Stops the watcher thread (on exit).
+    pub fn stop_watcher(&self) {
+        drop(lock(&self.watcher).take());
     }
 
     pub fn history(&self) -> MutexGuard<'_, History> {
@@ -94,8 +125,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Entry point for watchers (phase 3).
-    #[allow(dead_code)]
+    /// Entry point for watchers; runs on the watcher thread.
     pub fn handle_snapshot<R: Runtime>(&self, app: &AppHandle<R>, snapshot: &ClipboardSnapshot) {
         let excluded = lock(&self.settings).excluded_apps.clone();
         let ctx = IngestContext {

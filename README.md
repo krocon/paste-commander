@@ -4,7 +4,7 @@ Clipboard history for **macOS, Windows and Linux**. Everything you copy lands in
 
 Built with **Tauri 2 + Rust**; the UI is **Angular 22** (zoneless, signals, CSS variables). All logic lives in Rust. Everything stays local, and the app makes no network connections.
 
-> Status: **Phase 2 of 7**. Done: tray, single-instance, settings, autostart, plus the history (SQLite) and privacy filter with tests. Not yet implemented: clipboard watching, the picker list and pasting.
+> Status: **Phase 3 of 7**. Copies from other apps are now recorded on macOS, Windows, X11 and Wayland data-control compositors. Not yet implemented: the picker list, pasting and global shortcuts.
 
 ## Platform matrix
 
@@ -85,10 +85,23 @@ src-tauri/src/
   history/                SQLite history: dedupe, pins, limit, search, persistence switch
   privacy.rs              Confidential markers (macOS/Windows/KDE), app exclusion list
   ingest.rs               watcher → pause → own-write guard → privacy → history
-  watcher/                Trait `ClipboardWatcher` (+ fake for tests); platform impls in phase 3
+  watcher/                `ClipboardWatcher` trait and the runtime choice of watcher
+    macos.rs              NSPasteboard changeCount polling (250 ms)
+    windows.rs            AddClipboardFormatListener (message-only window)
+    x11.rs                XFixes selection events, TARGETS/INCR; also the XWayland fallback
+    wayland.rs            ext/wlr data-control via wl-clipboard-rs
+    linux_it.rs           Integration tests against Xvfb and a headless sway
 ```
 
-Planned modules: platform watchers (macos, windows, x11, wayland_data_control, fallback), `paste`, `hotkeys`.
+Planned modules: `paste`, `hotkeys`.
+
+### Linux watcher integration tests
+
+`scripts/linux-watcher-tests.sh` runs the ignored watcher tests against Xvfb and a headless sway (needs `xvfb xclip sway`). CI runs it on Ubuntu. Locally on macOS, in Docker:
+
+```bash
+docker run --rm -v "$PWD":/work -w /work <image with tauri deps + xvfb xclip sway> scripts/linux-watcher-tests.sh
+```
 
 ## Storage
 
