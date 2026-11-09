@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { PlatformInfo, Settings } from './models';
+import type { EntrySummary, PlatformInfo, Settings } from './models';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -42,6 +42,27 @@ export class Backend {
     const saved = await invoke<Settings>('update_settings', { settings });
     this._settings.set(saved);
     return saved;
+  }
+
+  getHistory(query?: string): Promise<EntrySummary[]> {
+    return isTauri ? invoke<EntrySummary[]>('get_history', { query: query ?? null }) : Promise.resolve([]);
+  }
+
+  deleteEntry(id: number): Promise<boolean> {
+    return invoke<boolean>('delete_entry', { id });
+  }
+
+  setPinned(id: number, pinned: boolean): Promise<boolean> {
+    return invoke<boolean>('set_pinned', { id, pinned });
+  }
+
+  clearHistory(): Promise<number> {
+    return invoke<number>('clear_history');
+  }
+
+  /** Fires (without payload) whenever entries change. */
+  onHistoryChanged(handler: () => void): Promise<() => void> {
+    return isTauri ? listen('history-changed', handler) : Promise.resolve(() => {});
   }
 
   hidePicker(): Promise<void> {

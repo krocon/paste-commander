@@ -12,6 +12,10 @@
     "allow-update-settings",
     "allow-get-platform-info",
     "allow-hide-picker",
-    "allow-open-settings"
+    "allow-open-settings",
+    "allow-get-history",
+    "allow-delete-entry",
+    "allow-set-pinned",
+    "allow-clear-history"
   ]
 }

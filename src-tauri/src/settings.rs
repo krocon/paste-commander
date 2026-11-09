@@ -79,7 +79,10 @@ impl Default for Settings {
             clear_history_on_exit: false,
             restore_clipboard: true,
             launch_at_login: false,
-            excluded_apps: Vec::new(),
+            excluded_apps: crate::privacy::DEFAULT_EXCLUDED_APPS
+                .iter()
+                .map(|s| (*s).to_owned())
+                .collect(),
             shortcuts: Shortcuts::default(),
         }
     }

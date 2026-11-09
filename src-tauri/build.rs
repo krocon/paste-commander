@@ -8,6 +8,10 @@ fn main() {
             "get_platform_info",
             "hide_picker",
             "open_settings",
+            "get_history",
+            "delete_entry",
+            "set_pinned",
+            "clear_history",
         ]),
     ))
     .expect("failed to run tauri-build");

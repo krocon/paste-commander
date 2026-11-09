@@ -21,7 +21,6 @@ mod ids {
 /// Event names the webview listens to.
 pub mod events {
     pub const PAUSED_CHANGED: &str = "paused-changed";
-    pub const CLEAR_HISTORY: &str = "clear-history-requested";
 }
 
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>> {
@@ -79,13 +78,18 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     Ok(())
 }
 
+/// Tray "Clear History": pinned entries are deliberate and survive.
+fn clear_history<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+    let removed = app.state::<AppState>().history().clear(true)?;
+    log::info!("cleared {removed} history entries");
+    app.emit(crate::state::HISTORY_CHANGED, ())?;
+    Ok(())
+}
+
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     let result = match id {
         ids::OPEN_HISTORY => windows::show_picker(app),
-        ids::CLEAR_HISTORY => {
-            // History lands in phase 2; the event is already part of the contract.
-            app.emit(events::CLEAR_HISTORY, ()).map_err(Into::into)
-        }
+        ids::CLEAR_HISTORY => clear_history(app),
         ids::PAUSE => {
             let state = app.state::<AppState>();
             let paused = !state.is_paused();

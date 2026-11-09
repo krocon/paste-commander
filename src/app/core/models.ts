@@ -40,3 +40,19 @@ export interface PlatformInfo {
   globalShortcuts: Capability;
   pasteSimulation: Capability;
 }
+
+export type EntryKind = 'text';
+
+/** Mirrors `history::EntrySummary`: a bounded preview, never the full text. */
+export interface EntrySummary {
+  id: number;
+  kind: EntryKind;
+  preview: string;
+  /** Full length in characters. */
+  chars: number;
+  sourceApp: string | null;
+  /** Unix milliseconds. */
+  createdAt: number;
+  copiedAt: number;
+  pinned: boolean;
+}

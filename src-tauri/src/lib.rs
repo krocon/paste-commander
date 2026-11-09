@@ -1,15 +1,26 @@
 //! Paste Commander – clipboard history for macOS, Windows and Linux.
 //!
 //! All logic lives in Rust; the Angular webview only renders and calls commands.
-//! Planned modules (later phases): `watcher`, `privacy`, `history`, `paste`, `hotkeys`.
+//! Planned modules (later phases): `paste`, `hotkeys`, platform watchers.
+//!
+//! `allow(dead_code)` below: parts of these modules are only called by the
+//! watchers and the paste service (phases 3–5). Remove the allows then.
 
 mod commands;
 mod error;
+#[allow(dead_code)]
+mod history;
 mod i18n;
+#[allow(dead_code)]
+mod ingest;
 mod platform;
+#[allow(dead_code)]
+mod privacy;
 mod settings;
 mod state;
 mod tray;
+#[allow(dead_code)]
+mod watcher;
 mod windows;
 
 use tauri::{Manager, RunEvent};
@@ -51,7 +62,7 @@ pub fn run() {
             if let Ok(enabled) = handle.autolaunch().is_enabled() {
                 settings.launch_at_login = enabled;
             }
-            let state = AppState::new(settings);
+            let state = AppState::new(settings, state::history_file(handle)?);
             log::info!("platform: {:?}", state.platform);
             app.manage(state);
 
@@ -65,18 +76,35 @@ pub fn run() {
             commands::get_platform_info,
             commands::hide_picker,
             commands::open_settings,
+            commands::get_history,
+            commands::delete_entry,
+            commands::set_pinned,
+            commands::clear_history,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Paste Commander");
 
-    app.run(|_app, event| {
+    app.run(|app, event| match event {
         // Background app: closing the last window must not quit. Only an explicit
         // `exit` (tray "Quit") carries an exit code.
-        if let RunEvent::ExitRequested {
+        RunEvent::ExitRequested {
             api, code: None, ..
-        } = event
-        {
-            api.prevent_exit();
-        }
+        } => api.prevent_exit(),
+        RunEvent::Exit => on_exit(app),
+        _ => {}
     });
+}
+
+/// "Clear history on quit" keeps pinned entries: pins are explicit "keep this".
+fn on_exit<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let settings = state.settings();
+    if settings.persist_history && settings.clear_history_on_exit {
+        match state.history().clear(true) {
+            Ok(n) => log::info!("cleared {n} entries on exit"),
+            Err(e) => log::error!("clearing history on exit failed: {e}"),
+        }
+    }
 }

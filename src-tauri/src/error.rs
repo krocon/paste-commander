@@ -10,6 +10,8 @@ pub enum Error {
     Autostart(String),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error("history: {0}")]
+    History(#[from] crate::history::HistoryError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
