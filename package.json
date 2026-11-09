@@ -13,7 +13,7 @@
     "tauri:build:mac:local": "tauri build --bundles app,dmg",
     "tauri:build:linux": "tauri build --bundles deb,rpm,appimage",
     "tauri:build:windows": "tauri build --bundles msi,nsis",
-    "tauri:build:win": "tauri build --bundles msi,nsis",
+    "tauri:build:win": "tauri build --bundles msi,nsis"
   },
   "private": true,
   "packageManager": "npm@12.2.0",
