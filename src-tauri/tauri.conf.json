@@ -45,7 +45,8 @@
         "form-action": "'none'",
         "frame-ancestors": "'none'"
       },
-      "freezePrototype": true
+      "freezePrototype": true,
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {
